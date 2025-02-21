@@ -1,0 +1,44 @@
+name: ESP32 Build
+
+on:
+  push:
+    branches: [ main, develop ]  # Runs on push to these branches
+  pull_request:
+    branches: [ main, develop ]  # Runs on PRs to these branches
+
+jobs:
+  build:
+    runs-on: ubuntu-latest  # Use Ubuntu as the build environment
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.x"  # ESP-IDF requires Python
+
+    - name: Install ESP-IDF dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y git wget flex bison gperf python3 python3-pip python3-venv ninja-build ccache libffi-dev libssl-dev dfu-util
+
+    - name: Set up ESP-IDF
+      run: |
+        git clone --recursive https://github.com/espressif/esp-idf.git esp-idf
+        cd esp-idf
+        ./install.sh
+        . ./export.sh
+        cd ..
+
+    - name: Build ESP32 firmware
+      run: |
+        . esp-idf/export.sh  # Load ESP-IDF environment
+        idf.py build         # Build the project
+
+    - name: Upload firmware as artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: firmware
+        path: build/*.bin
