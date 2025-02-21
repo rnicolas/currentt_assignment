@@ -38,7 +38,7 @@ jobs:
         idf.py build         # Build the project
 
     - name: Upload firmware as artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: firmware
         path: build/*.bin
