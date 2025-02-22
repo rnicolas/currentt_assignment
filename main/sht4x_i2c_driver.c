@@ -6,7 +6,8 @@
 #include "esp_err.h"
 
 #define I2C_TIMEOUT_MS      50
-#define SHT4X_I2C_ADDR      0x44
+#define SHT4X_I2C_ADDR      0x44 // can be also 0x45 or 0x46
+#define SHT4X_I2C_CLK_SPEED 100000
 #define SHT4X_SERIAL_NUMBER 0x89
 
 static const char *TAG = "SHT4X_DRIVER";
@@ -62,7 +63,7 @@ uint8_t sht4x_crc8(const uint8_t *data, size_t len) {
  */
 esp_err_t sht4x_write_command(i2c_master_bus_handle_t bus_handle, uint8_t command) {
     i2c_device_config_t i2c_dev_conf = {
-        .scl_speed_hz = 100000, // 100kHz
+        .scl_speed_hz = SHT4X_I2C_CLK_SPEED, // 100kHz
         .device_address = SHT4X_I2C_ADDR,
     };
     i2c_master_dev_handle_t dev_handle;
@@ -104,7 +105,7 @@ esp_err_t sht4x_write_command(i2c_master_bus_handle_t bus_handle, uint8_t comman
  */
 esp_err_t sht4x_read_data(i2c_master_bus_handle_t bus_handle, uint8_t command, uint8_t *data, size_t len) {
     i2c_device_config_t i2c_dev_conf = {
-        .scl_speed_hz = 100000, // 100kHz
+        .scl_speed_hz = SHT4X_I2C_CLK_SPEED, // 100kHz
         .device_address = SHT4X_I2C_ADDR,
     };
     i2c_master_dev_handle_t dev_handle;

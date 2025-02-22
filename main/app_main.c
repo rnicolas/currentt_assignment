@@ -86,7 +86,7 @@ void app_main(void) {
     do {
         err = i2c_new_master_bus(&i2c_bus_config, &i2c_bus_handle);
         if (err == ESP_OK) {
-            ESP_LOGI("I2C", "I2C bus initialized successfully");
+            ESP_LOGI(TAG, "I2C bus initialized successfully");
             break;
         }
     
@@ -97,7 +97,7 @@ void app_main(void) {
         retry_count++;
     
         if (retry_count >= max_retries) {
-            ESP_LOGE("I2C", "I2C initialization failed after %d attempts! Restarting system...", max_retries);
+            ESP_LOGE(TAG, "I2C initialization failed after %d attempts! Restarting system...", max_retries);
             esp_restart();  // Soft reset the ESP32
         }
     } while (true);
