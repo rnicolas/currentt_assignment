@@ -43,10 +43,51 @@ static const char *TAG = "APP_MAIN";
  * @warning Ensure `i2c_mutex` is properly initialized before starting this task.
  */
 void sht4x_read_task(void *pvParameters) {
+    static int total_crc_failures = 0;
+    const int max_crc_retries = 5;
+    const int max_general_retries = 3;
+    const int max_crc_failures = 10;
     while (1) {
         if (xSemaphoreTake(i2c_mutex, portMAX_DELAY)) {
-            err = sht4x_measure_temp_humidity(i2c_bus_handle, SHT4X_MEASURE_MED_PRECISION, &temperature, &humidity);
-            new_data = true;
+            int crc_retry_count = 0;
+            int general_retry_count = 0;
+
+            do {
+                err = sht4x_measure_temp_humidity(i2c_bus_handle, SHT4X_MEASURE_MED_PRECISION, &temperature, &humidity);
+                if (err == ESP_OK) {
+                    total_crc_failures = 0;
+                    new_data = true;
+                    break;
+                } else if (err == ESP_ERR_INVALID_CRC) {
+                    ESP_LOGW("SHT4X", "CRC mismatch, retrying... (%d/%d)", crc_retry_count + 1, max_crc_retries);
+                    crc_retry_count++;
+                } else {
+                    ESP_LOGW("SHT4X", "Measurement failed (error: %s), retrying... (%d/%d)", 
+                             esp_err_to_name(err), general_retry_count + 1, max_general_retries);
+                    general_retry_count++;
+                    // we retry, but if still fails, we just log it, in this case physical inspection must be done.
+                }
+                vTaskDelay(pdMS_TO_TICKS(100));
+            } while (crc_retry_count < max_crc_retries && general_retry_count < max_general_retries);
+
+            if (general_retry_count >= max_general_retries) {
+                ESP_LOGE("SHT4X", "Measurement failed multiple times, check physical connections!");
+            }
+
+            if (crc_retry_count >= max_crc_retries) {
+                ESP_LOGE("SHT4X", "Repeated CRC failures! Resetting sensor...");
+                sht4x_soft_reset(i2c_bus_handle);
+                vTaskDelay(pdMS_TO_TICKS(10));
+                total_crc_failures++;
+
+                ESP_LOGW("SHT4X", "Total CRC failures: %d", total_crc_failures);
+                if (total_crc_failures >= max_crc_failures) {
+                    // We have reset the sensor 5 times, restart ESP32
+                    ESP_LOGE("SHT4X", "Critical sensor failure, restarting ESP32...");
+                    esp_restart();
+                }
+            }
+
             xSemaphoreGive(i2c_mutex);
         }
         vTaskDelay(pdMS_TO_TICKS(2000));
@@ -109,12 +150,14 @@ void app_main(void) {
             sn_bytes[3], sn_bytes[2], sn_bytes[1], sn_bytes[0]);
     } else {
         ESP_LOGE(TAG, "Error reading SN: %s", esp_err_to_name(err));
+        sht4x_soft_reset(i2c_bus_handle); //if error getting serial number,
+        esp_restart();                    //restart esp32 and reset the sensor
     }
 
     i2c_mutex = xSemaphoreCreateMutex();
     if (i2c_mutex == NULL) {
         ESP_LOGE(TAG, "Failed to create mutex");
-        return;
+        esp_restart(); // Restart if mutex creation fails
     }
 
     xTaskCreate(sht4x_read_task, "SHT4X_Read_Task", 4096, NULL, 5, NULL);
