@@ -28,19 +28,17 @@ float temperature, humidity;
 static const char *TAG = "APP_MAIN";
 
 /**
- * @brief Task to read temperature and humidity from the SHT4x sensor.
+ * @brief Task to periodically read temperature and humidity from the SHT4x sensor.
  *
- * This function continuously acquires temperature and humidity data from the 
- * SHT4x sensor at regular intervals (every 2 seconds). It uses a mutex to 
- * ensure safe access to the I2C bus.
+ * This task runs continuously and performs temperature and humidity measurements using
+ * the SHT4x sensor. It implements retry mechanisms for both CRC failures and general 
+ * communication failures. If CRC failures exceed a defined threshold, the sensor is reset.
+ * If multiple resets occur without resolution, the ESP32 is restarted.
  *
- * @param[in] pvParameters Unused parameter (can be NULL).
+ * @param pvParameters Unused task parameters (required by FreeRTOS).
  *
- * @note The function runs indefinitely as part of an RTOS task.
- * @note Assumes `i2c_mutex`, `i2c_bus_handle`, `temperature`, `humidity`, 
- *       and `new_data` are declared globally.
- * 
- * @warning Ensure `i2c_mutex` is properly initialized before starting this task.
+ * @note The function runs indefinitely and should be created as a FreeRTOS task.
+ * @note Uses `i2c_mutex` for thread-safe I2C communication.
  */
 void sht4x_read_task(void *pvParameters) {
     static int total_crc_failures = 0;
@@ -93,7 +91,6 @@ void sht4x_read_task(void *pvParameters) {
         vTaskDelay(pdMS_TO_TICKS(2000));
     }
 }
-
 
 /**
  * @brief Main application entry point for initializing and reading SHT4x sensor data.
